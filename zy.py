@@ -25,11 +25,11 @@ class KnowledgeBase:
 
     def _load_source(self, source: str) -> list:
         if source.startswith("http://") or source.startswith("https://"):
-            docs = WebBaseLoader(source).load()
+            return WebBaseLoader(source).load()
+        elif source.endswith(".pdf"):
+            return PyPDFLoader(source).load()
         else:
-            if source.endswith(".pdf"):
-                docs = PyPDFLoader(source).load()
-        return docs
+            raise ValueError(f"暂不支持的文件类型：{source}")
 
 
 
@@ -41,15 +41,17 @@ class KnowledgeBase:
             loader.extend(self._load_source(source))
         parent_docs = self.parent_splitter.split_documents(loader)
 
-        add_counts = 0
+        add_counts = 0  # 统计父文档数量
+        all_children = []
         for parent_doc in parent_docs:
             parent_id = str(uuid.uuid4())
+            parent_doc.metadata["parent_id"] = parent_id
             self.docstore[parent_id] = parent_doc
             add_counts += 1
-            parent_doc.metadata["parent_id"] = parent_id
             child_doc = self.child_splitter.split_documents([parent_doc])
-            self.vectorstore.add_documents(child_doc)
-            self.all_small_chunks.extend(child_doc)
+            all_children.extend(child_doc)
+        self.vectorstore.add_documents(all_children)
+        self.all_small_chunks.extend(all_children)
         return add_counts   # 13
 
 
@@ -59,36 +61,6 @@ class KnowledgeBase:
         # 返回 EnsembleRetriever（向量 + BM25）
         # 内部用 ParentDocumentRetriever 作为向量检索的基础
         ...
-
-
-# loader1 = WebBaseLoader("https://python.langchain.com/docs/introduction/")
-# docs1 = loader1.load()
-
-
-
-# splitter1 = RecursiveCharacterTextSplitter(
-#     chunk_size=400,
-#     chunk_overlap=80,
-# )
-
-# chunks1 = splitter1.split_documents(docs1)
-# print(len(chunks1)) # 16
-# print(chunks1[0].metadata)  # {'source': 'https://python.langchain.com/docs/introduction/', 'title': 'LangChain overview - Docs by LangChain', 'description': 'LangChain is an open source framework with a prebuilt agent architecture and integrations for any model or tool—so you can build agents that adapt as fast as the ecosystem evolves', 'language': 'en'}
-# print(chunks1[0].page_content)
-
-
-# loader2 = PyPDFLoader("./asset/db.pdf")
-# docs2 = loader2.load()
-#
-# splitter2 = RecursiveCharacterTextSplitter(
-#     chunk_size=400,
-#     chunk_overlap=80
-# )
-# chunks2 = splitter2.split_documents(docs2)
-# print(len(chunks2))     # 24
-# print(chunks2[0].metadata)  # {'producer': 'Typora', 'creator': 'Typora', 'creationdate': '20260319144557', 'moddate': '20260319144557', 'source': './asset/db.pdf', 'total_pages': 10, 'page': 0, 'page_label': '1'}
-# print(chunks2[0].page_content)
-
 
 
 if __name__ == '__main__':
