@@ -26,3 +26,6 @@ Thumbs.db
 # Local config
 config.local.py
 .env.local
+
+# PyCharm
+.idea
